@@ -6,539 +6,229 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Data directory setup
 const DATA_DIR = process.env.DATA_DIR || '/home/node/emika/mission-control';
 const TASKS_FILE = path.join(DATA_DIR, 'tasks.json');
 const ACTIVITIES_FILE = path.join(DATA_DIR, 'activities.json');
+const COLUMNS_FILE = path.join(DATA_DIR, 'columns.json');
 
-// Middleware
+const DEFAULT_COLUMNS = [
+    { id: 'today', name: 'Today', order: 0 },
+    { id: 'this-week', name: 'This Week', order: 1 },
+    { id: 'later', name: 'Later', order: 2 },
+    { id: 'done', name: 'Done', order: 3 },
+];
+
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
-
-// Serve static files
 app.use(express.static('.'));
 
-// Ensure data directory exists
+// ── Helpers ──
+
 async function ensureDataDir() {
     try {
         await fs.ensureDir(DATA_DIR);
-        console.log(`Data directory ensured: ${DATA_DIR}`);
-        
-        // Initialize files if they don't exist
-        if (!(await fs.pathExists(TASKS_FILE))) {
-            await fs.writeJson(TASKS_FILE, []);
-            console.log('Initialized tasks.json');
-        }
-        
-        if (!(await fs.pathExists(ACTIVITIES_FILE))) {
-            await fs.writeJson(ACTIVITIES_FILE, []);
-            console.log('Initialized activities.json');
-        }
+        if (!(await fs.pathExists(TASKS_FILE))) await fs.writeJson(TASKS_FILE, []);
+        if (!(await fs.pathExists(ACTIVITIES_FILE))) await fs.writeJson(ACTIVITIES_FILE, []);
+        if (!(await fs.pathExists(COLUMNS_FILE))) await fs.writeJson(COLUMNS_FILE, DEFAULT_COLUMNS);
     } catch (error) {
-        console.error('Error ensuring data directory:', error);
-        // Fallback to local directory
-        const fallbackDir = path.join(__dirname, 'data');
-        await fs.ensureDir(fallbackDir);
-        console.log(`Using fallback data directory: ${fallbackDir}`);
-        return fallbackDir;
-    }
-    return DATA_DIR;
-}
-
-// Load data from JSON files
-async function loadTasks() {
-    try {
-        if (await fs.pathExists(TASKS_FILE)) {
-            return await fs.readJson(TASKS_FILE);
-        }
-        return [];
-    } catch (error) {
-        console.error('Error loading tasks:', error);
-        return [];
+        console.error('Data dir error:', error);
+        const fallback = path.join(__dirname, 'data');
+        await fs.ensureDir(fallback);
     }
 }
 
-async function saveTasks(tasks) {
-    try {
-        await fs.writeJson(TASKS_FILE, tasks, { spaces: 2 });
-        return true;
-    } catch (error) {
-        console.error('Error saving tasks:', error);
-        return false;
-    }
+async function load(file, fallback = []) {
+    try { return await fs.pathExists(file) ? await fs.readJson(file) : fallback; }
+    catch { return fallback; }
+}
+async function save(file, data) {
+    try { await fs.writeJson(file, data, { spaces: 2 }); return true; }
+    catch { return false; }
 }
 
-async function loadActivities() {
-    try {
-        if (await fs.pathExists(ACTIVITIES_FILE)) {
-            return await fs.readJson(ACTIVITIES_FILE);
-        }
-        return [];
-    } catch (error) {
-        console.error('Error loading activities:', error);
-        return [];
-    }
-}
-
-async function saveActivities(activities) {
-    try {
-        await fs.writeJson(ACTIVITIES_FILE, activities, { spaces: 2 });
-        return true;
-    } catch (error) {
-        console.error('Error saving activities:', error);
-        return false;
-    }
-}
-
-// API Routes
-
-// Get all tasks
-app.get('/api/tasks', async (req, res) => {
-    try {
-        const tasks = await loadTasks();
-        res.json(tasks);
-    } catch (error) {
-        console.error('Error getting tasks:', error);
-        res.status(500).json({ error: 'Failed to load tasks' });
-    }
-});
-
-// Get single task
-app.get('/api/tasks/:id', async (req, res) => {
-    try {
-        const tasks = await loadTasks();
-        const task = tasks.find(t => t.id === req.params.id);
-        
-        if (!task) {
-            return res.status(404).json({ error: 'Task not found' });
-        }
-        
-        res.json(task);
-    } catch (error) {
-        console.error('Error getting task:', error);
-        res.status(500).json({ error: 'Failed to load task' });
-    }
-});
-
-// Create new task
-app.post('/api/tasks', async (req, res) => {
-    try {
-        const tasks = await loadTasks();
-        const newTask = {
-            id: req.body.id || `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            title: req.body.title,
-            description: req.body.description || '',
-            priority: req.body.priority || 'medium',
-            status: req.body.status || 'inbox',
-            assignee: req.body.assignee || '',
-            dueDate: req.body.dueDate || null,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            comments: req.body.comments || []
-        };
-        
-        // Validate required fields
-        if (!newTask.title) {
-            return res.status(400).json({ error: 'Task title is required' });
-        }
-        
-        tasks.push(newTask);
-        
-        if (await saveTasks(tasks)) {
-            // Log activity
-            await logActivity('created', `Created task: ${newTask.title}`, 'System');
-            res.status(201).json(newTask);
-        } else {
-            res.status(500).json({ error: 'Failed to save task' });
-        }
-    } catch (error) {
-        console.error('Error creating task:', error);
-        res.status(500).json({ error: 'Failed to create task' });
-    }
-});
-
-// Update task
-app.put('/api/tasks', async (req, res) => {
-    try {
-        const tasks = await loadTasks();
-        const taskIndex = tasks.findIndex(t => t.id === req.body.id);
-        
-        if (taskIndex === -1) {
-            return res.status(404).json({ error: 'Task not found' });
-        }
-        
-        const oldTask = { ...tasks[taskIndex] };
-        const updatedTask = {
-            ...oldTask,
-            ...req.body,
-            updatedAt: new Date().toISOString()
-        };
-        
-        // Validate required fields
-        if (!updatedTask.title) {
-            return res.status(400).json({ error: 'Task title is required' });
-        }
-        
-        tasks[taskIndex] = updatedTask;
-        
-        if (await saveTasks(tasks)) {
-            // Log activity for status changes
-            if (oldTask.status !== updatedTask.status) {
-                await logActivity('moved', `Moved task "${updatedTask.title}" from ${oldTask.status} to ${updatedTask.status}`, 'System');
-            } else {
-                await logActivity('updated', `Updated task: ${updatedTask.title}`, 'System');
-            }
-            
-            res.json(updatedTask);
-        } else {
-            res.status(500).json({ error: 'Failed to update task' });
-        }
-    } catch (error) {
-        console.error('Error updating task:', error);
-        res.status(500).json({ error: 'Failed to update task' });
-    }
-});
-
-// Delete task
-app.delete('/api/tasks/:id', async (req, res) => {
-    try {
-        const tasks = await loadTasks();
-        const taskIndex = tasks.findIndex(t => t.id === req.params.id);
-        
-        if (taskIndex === -1) {
-            return res.status(404).json({ error: 'Task not found' });
-        }
-        
-        const deletedTask = tasks[taskIndex];
-        tasks.splice(taskIndex, 1);
-        
-        if (await saveTasks(tasks)) {
-            await logActivity('deleted', `Deleted task: ${deletedTask.title}`, 'System');
-            res.json({ message: 'Task deleted successfully' });
-        } else {
-            res.status(500).json({ error: 'Failed to delete task' });
-        }
-    } catch (error) {
-        console.error('Error deleting task:', error);
-        res.status(500).json({ error: 'Failed to delete task' });
-    }
-});
-
-// Get activities
-app.get('/api/activities', async (req, res) => {
-    try {
-        const activities = await loadActivities();
-        res.json(activities);
-    } catch (error) {
-        console.error('Error getting activities:', error);
-        res.status(500).json({ error: 'Failed to load activities' });
-    }
-});
-
-// Add activity (for AI Employee to post updates)
-app.post('/api/activities', async (req, res) => {
-    try {
-        const activities = await loadActivities();
-        const newActivity = {
-            id: `activity_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            type: req.body.type || 'update',
-            content: req.body.content,
-            author: req.body.author || 'AI Employee',
-            createdAt: new Date().toISOString()
-        };
-        
-        if (!newActivity.content) {
-            return res.status(400).json({ error: 'Activity content is required' });
-        }
-        
-        activities.unshift(newActivity);
-        
-        // Keep only last 100 activities
-        if (activities.length > 100) {
-            activities.splice(100);
-        }
-        
-        if (await saveActivities(activities)) {
-            res.status(201).json(newActivity);
-        } else {
-            res.status(500).json({ error: 'Failed to save activity' });
-        }
-    } catch (error) {
-        console.error('Error creating activity:', error);
-        res.status(500).json({ error: 'Failed to create activity' });
-    }
-});
-
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-    res.json({ 
-        status: 'ok', 
-        timestamp: new Date().toISOString(),
-        dataDir: DATA_DIR,
-        tasksFile: TASKS_FILE
-    });
-});
-
-// Statistics endpoint
-app.get('/api/stats', async (req, res) => {
-    try {
-        const tasks = await loadTasks();
-        const now = new Date();
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        
-        const stats = {
-            total: tasks.length,
-            byStatus: {
-                inbox: tasks.filter(t => t.status === 'inbox').length,
-                today: tasks.filter(t => t.status === 'today').length,
-                'this-week': tasks.filter(t => t.status === 'this-week').length,
-                later: tasks.filter(t => t.status === 'later').length,
-                done: tasks.filter(t => t.status === 'done').length
-            },
-            byPriority: {
-                low: tasks.filter(t => t.priority === 'low').length,
-                medium: tasks.filter(t => t.priority === 'medium').length,
-                high: tasks.filter(t => t.priority === 'high').length,
-                urgent: tasks.filter(t => t.priority === 'urgent').length
-            },
-            completedToday: tasks.filter(t => 
-                t.status === 'done' && 
-                new Date(t.updatedAt) >= todayStart
-            ).length,
-            overdue: tasks.filter(t => {
-                if (t.status === 'done' || !t.dueDate) return false;
-                return new Date(t.dueDate) < now;
-            }).length
-        };
-        
-        res.json(stats);
-    } catch (error) {
-        console.error('Error calculating stats:', error);
-        res.status(500).json({ error: 'Failed to calculate statistics' });
-    }
-});
-
-// Daily summary endpoint for AI Employee
-app.get('/api/daily-summary', async (req, res) => {
-    try {
-        const tasks = await loadTasks();
-        const activities = await loadActivities();
-        const now = new Date();
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        
-        // Tasks completed today
-        const completedToday = tasks.filter(t => 
-            t.status === 'done' && 
-            new Date(t.updatedAt) >= todayStart
-        );
-        
-        // Tasks that moved today
-        const movedToday = tasks.filter(t => 
-            new Date(t.updatedAt) >= todayStart
-        );
-        
-        // Tasks by current status
-        const tasksByStatus = {
-            inbox: tasks.filter(t => t.status === 'inbox').length,
-            today: tasks.filter(t => t.status === 'today').length,
-            'this-week': tasks.filter(t => t.status === 'this-week').length,
-            later: tasks.filter(t => t.status === 'later').length,
-            done: tasks.filter(t => t.status === 'done').length
-        };
-        
-        // Overdue tasks
-        const overdue = tasks.filter(t => {
-            if (t.status === 'done' || !t.dueDate) return false;
-            return new Date(t.dueDate) < now;
-        });
-        
-        // Today's activities
-        const todayActivities = activities.filter(a => 
-            new Date(a.createdAt) >= todayStart
-        );
-        
-        const summary = {
-            date: now.toISOString().split('T')[0],
-            completedToday: completedToday.length,
-            movedToday: movedToday.length,
-            tasksByStatus,
-            overdueTasks: overdue.length,
-            activitiesCount: todayActivities.length,
-            completedTasks: completedToday.map(t => ({
-                id: t.id,
-                title: t.title,
-                priority: t.priority
-            })),
-            overdueTasks: overdue.map(t => ({
-                id: t.id,
-                title: t.title,
-                dueDate: t.dueDate,
-                priority: t.priority
-            }))
-        };
-        
-        res.json(summary);
-    } catch (error) {
-        console.error('Error generating daily summary:', error);
-        res.status(500).json({ error: 'Failed to generate daily summary' });
-    }
-});
-
-// Morning update endpoint for AI Employee
-app.get('/api/morning-update', async (req, res) => {
-    try {
-        const tasks = await loadTasks();
-        const now = new Date();
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
-        
-        // Tasks for today
-        const todayTasks = tasks.filter(t => t.status === 'today');
-        
-        // Tasks due today
-        const dueToday = tasks.filter(t => {
-            if (!t.dueDate || t.status === 'done') return false;
-            const dueDate = new Date(t.dueDate);
-            return dueDate >= todayStart && dueDate < tomorrowStart;
-        });
-        
-        // Overdue tasks
-        const overdue = tasks.filter(t => {
-            if (t.status === 'done' || !t.dueDate) return false;
-            return new Date(t.dueDate) < todayStart;
-        });
-        
-        // High priority tasks
-        const highPriority = tasks.filter(t => 
-            t.status !== 'done' && 
-            (t.priority === 'urgent' || t.priority === 'high')
-        );
-        
-        // Inbox items that need attention
-        const inboxTasks = tasks.filter(t => t.status === 'inbox');
-        
-        const update = {
-            date: now.toISOString().split('T')[0],
-            todayTasks: todayTasks.length,
-            dueToday: dueToday.length,
-            overdue: overdue.length,
-            highPriority: highPriority.length,
-            inboxItems: inboxTasks.length,
-            tasks: {
-                today: todayTasks.map(t => ({
-                    id: t.id,
-                    title: t.title,
-                    priority: t.priority
-                })),
-                dueToday: dueToday.map(t => ({
-                    id: t.id,
-                    title: t.title,
-                    dueDate: t.dueDate,
-                    priority: t.priority
-                })),
-                overdue: overdue.map(t => ({
-                    id: t.id,
-                    title: t.title,
-                    dueDate: t.dueDate,
-                    priority: t.priority
-                })),
-                highPriority: highPriority.map(t => ({
-                    id: t.id,
-                    title: t.title,
-                    status: t.status,
-                    priority: t.priority
-                })),
-                inbox: inboxTasks.slice(0, 5).map(t => ({
-                    id: t.id,
-                    title: t.title,
-                    priority: t.priority
-                }))
-            }
-        };
-        
-        res.json(update);
-    } catch (error) {
-        console.error('Error generating morning update:', error);
-        res.status(500).json({ error: 'Failed to generate morning update' });
-    }
-});
-
-// Helper function to log activities
 async function logActivity(type, content, author = 'System') {
     try {
-        const activities = await loadActivities();
-        const activity = {
-            id: `activity_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            type: type,
-            content: content,
-            author: author,
+        const activities = await load(ACTIVITIES_FILE);
+        activities.unshift({
+            id: `act_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+            type, content, author,
             createdAt: new Date().toISOString()
-        };
-        
-        activities.unshift(activity);
-        
-        // Keep only last 100 activities
-        if (activities.length > 100) {
-            activities.splice(100);
-        }
-        
-        await saveActivities(activities);
-    } catch (error) {
-        console.error('Error logging activity:', error);
-    }
-}
-
-// Error handling middleware
-app.use((error, req, res, next) => {
-    console.error('Unhandled error:', error);
-    res.status(500).json({ 
-        error: 'Internal server error',
-        message: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-});
-
-// 404 handler
-app.use((req, res) => {
-    if (req.path.startsWith('/api/')) {
-        res.status(404).json({ error: 'API endpoint not found' });
-    } else {
-        // Serve index.html for SPA routing
-        res.sendFile(path.join(__dirname, 'index.html'));
-    }
-});
-
-// Initialize and start server
-async function startServer() {
-    try {
-        await ensureDataDir();
-        
-        app.listen(PORT, () => {
-            console.log(`
-🚀 Executive Assistant Mission Control Dashboard
-📊 Server running on port ${PORT}
-📁 Data directory: ${DATA_DIR}
-📄 Tasks file: ${TASKS_FILE}
-🔗 Dashboard: http://localhost:${PORT}
-🔗 API Health: http://localhost:${PORT}/api/health
-            `);
         });
-    } catch (error) {
-        console.error('Failed to start server:', error);
-        process.exit(1);
-    }
+        if (activities.length > 100) activities.splice(100);
+        await save(ACTIVITIES_FILE, activities);
+    } catch {}
 }
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-    console.log('Received SIGTERM, shutting down gracefully');
-    process.exit(0);
+// ── Columns API ──
+
+app.get('/api/columns', async (req, res) => {
+    const columns = await load(COLUMNS_FILE, DEFAULT_COLUMNS);
+    res.json(columns.sort((a, b) => a.order - b.order));
 });
 
-process.on('SIGINT', () => {
-    console.log('Received SIGINT, shutting down gracefully');
-    process.exit(0);
+app.post('/api/columns', async (req, res) => {
+    const columns = await load(COLUMNS_FILE, DEFAULT_COLUMNS);
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ error: 'Column name required' });
+    const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `col-${Date.now()}`;
+    if (columns.find(c => c.id === id)) return res.status(400).json({ error: 'Column already exists' });
+    const newCol = { id, name, order: columns.length };
+    columns.push(newCol);
+    await save(COLUMNS_FILE, columns);
+    await logActivity('column', `Added column: ${name}`);
+    res.status(201).json(newCol);
 });
 
-// Start the server
-startServer();
+app.put('/api/columns/:id', async (req, res) => {
+    const columns = await load(COLUMNS_FILE, DEFAULT_COLUMNS);
+    const col = columns.find(c => c.id === req.params.id);
+    if (!col) return res.status(404).json({ error: 'Column not found' });
+    if (req.body.name !== undefined) col.name = req.body.name;
+    if (req.body.order !== undefined) col.order = req.body.order;
+    await save(COLUMNS_FILE, columns);
+    res.json(col);
+});
+
+app.put('/api/columns', async (req, res) => {
+    // Bulk reorder: expects array of { id, order } or full column objects
+    const updates = req.body;
+    if (!Array.isArray(updates)) return res.status(400).json({ error: 'Expected array' });
+    const columns = await load(COLUMNS_FILE, DEFAULT_COLUMNS);
+    updates.forEach(u => {
+        const col = columns.find(c => c.id === u.id);
+        if (col) {
+            if (u.name !== undefined) col.name = u.name;
+            if (u.order !== undefined) col.order = u.order;
+        }
+    });
+    await save(COLUMNS_FILE, columns);
+    res.json(columns.sort((a, b) => a.order - b.order));
+});
+
+app.delete('/api/columns/:id', async (req, res) => {
+    let columns = await load(COLUMNS_FILE, DEFAULT_COLUMNS);
+    const col = columns.find(c => c.id === req.params.id);
+    if (!col) return res.status(404).json({ error: 'Column not found' });
+    // Move tasks from deleted column to inbox
+    const tasks = await load(TASKS_FILE);
+    let moved = 0;
+    tasks.forEach(t => { if (t.status === req.params.id) { t.status = 'inbox'; moved++; } });
+    if (moved) await save(TASKS_FILE, tasks);
+    columns = columns.filter(c => c.id !== req.params.id);
+    // Reindex order
+    columns.sort((a, b) => a.order - b.order).forEach((c, i) => c.order = i);
+    await save(COLUMNS_FILE, columns);
+    await logActivity('column', `Removed column: ${col.name}` + (moved ? ` (${moved} tasks moved to Inbox)` : ''));
+    res.json({ message: 'Column deleted', movedTasks: moved });
+});
+
+// ── Tasks API ──
+
+app.get('/api/tasks', async (req, res) => {
+    res.json(await load(TASKS_FILE));
+});
+
+app.get('/api/tasks/:id', async (req, res) => {
+    const tasks = await load(TASKS_FILE);
+    const task = tasks.find(t => t.id === req.params.id);
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+    res.json(task);
+});
+
+app.post('/api/tasks', async (req, res) => {
+    const tasks = await load(TASKS_FILE);
+    const t = {
+        id: req.body.id || `task_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`,
+        title: req.body.title,
+        description: req.body.description || '',
+        priority: req.body.priority || 'medium',
+        status: req.body.status || 'inbox',
+        assignee: req.body.assignee || '',
+        dueDate: req.body.dueDate || null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        comments: req.body.comments || []
+    };
+    if (!t.title) return res.status(400).json({ error: 'Title required' });
+    tasks.push(t);
+    await save(TASKS_FILE, tasks);
+    await logActivity('created', `Created task: ${t.title}`);
+    res.status(201).json(t);
+});
+
+app.put('/api/tasks', async (req, res) => {
+    const tasks = await load(TASKS_FILE);
+    const idx = tasks.findIndex(t => t.id === req.body.id);
+    if (idx === -1) return res.status(404).json({ error: 'Task not found' });
+    const old = { ...tasks[idx] };
+    tasks[idx] = { ...old, ...req.body, updatedAt: new Date().toISOString() };
+    await save(TASKS_FILE, tasks);
+    if (old.status !== tasks[idx].status) {
+        await logActivity('moved', `Moved "${tasks[idx].title}" → ${tasks[idx].status}`);
+    }
+    res.json(tasks[idx]);
+});
+
+app.delete('/api/tasks/:id', async (req, res) => {
+    let tasks = await load(TASKS_FILE);
+    const task = tasks.find(t => t.id === req.params.id);
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+    tasks = tasks.filter(t => t.id !== req.params.id);
+    await save(TASKS_FILE, tasks);
+    await logActivity('deleted', `Deleted: ${task.title}`);
+    res.json({ message: 'Deleted' });
+});
+
+// ── Activities API ──
+
+app.get('/api/activities', async (req, res) => {
+    res.json(await load(ACTIVITIES_FILE));
+});
+
+app.post('/api/activities', async (req, res) => {
+    if (!req.body.content) return res.status(400).json({ error: 'Content required' });
+    const activities = await load(ACTIVITIES_FILE);
+    const a = {
+        id: `act_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        type: req.body.type || 'update',
+        content: req.body.content,
+        author: req.body.author || 'AI Employee',
+        createdAt: new Date().toISOString()
+    };
+    activities.unshift(a);
+    if (activities.length > 100) activities.splice(100);
+    await save(ACTIVITIES_FILE, activities);
+    res.status(201).json(a);
+});
+
+// ── Stats & Health ──
+
+app.get('/api/stats', async (req, res) => {
+    const tasks = await load(TASKS_FILE);
+    const columns = await load(COLUMNS_FILE, DEFAULT_COLUMNS);
+    const byStatus = {};
+    columns.forEach(c => byStatus[c.id] = 0);
+    byStatus.inbox = 0;
+    tasks.forEach(t => { byStatus[t.status] = (byStatus[t.status] || 0) + 1; });
+    res.json({ total: tasks.length, byStatus });
+});
+
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// SPA fallback
+app.use((req, res) => {
+    if (req.path.startsWith('/api/')) return res.status(404).json({ error: 'Not found' });
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+async function start() {
+    await ensureDataDir();
+    app.listen(PORT, () => console.log(`🚀 Mission Control on port ${PORT}`));
+}
+
+process.on('SIGTERM', () => process.exit(0));
+process.on('SIGINT', () => process.exit(0));
+start();

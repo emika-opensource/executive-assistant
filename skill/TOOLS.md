@@ -1,188 +1,111 @@
-# Executive Assistant Mission Control - API Tools
+# Mission Control - API Tools
 
 ## Overview
 
-The Mission Control dashboard uses a kanban-style board with these columns:
-- **Inbox**: All new tasks land here initially
-- **Today**: Tasks to be completed today
-- **This Week**: Tasks for this week
-- **Later**: Future tasks and backlog
-- **Done**: Completed tasks
+Mission Control is a kanban board served at `http://localhost:3000`. Columns are fully dynamic — you can add, rename, reorder, and delete them via API.
 
-## Base URL
-```
-http://localhost:3000/api
-```
+Default columns: **Today**, **This Week**, **Later**, **Done** (plus **Inbox** which is always present).
 
-## Task Management
+Base URL: `http://localhost:3000`
 
-### Create Task
+---
+
+## Columns API
+
+### List columns
 ```bash
-curl -X POST http://localhost:3000/api/tasks \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "Review quarterly report",
-    "description": "Analyze Q3 performance metrics and prepare summary",
-    "priority": "high",
-    "status": "inbox",
-    "assignee": "AI Employee",
-    "dueDate": "2026-02-10T15:00:00Z"
-  }'
+curl http://localhost:3000/api/columns
 ```
 
-**Statuses**: `inbox`, `today`, `this-week`, `later`, `done`  
-**Priorities**: `low`, `medium`, `high`, `urgent`
-
-### Update Task (Move Between Columns)
+### Add a column
 ```bash
-curl -X PUT http://localhost:3000/api/tasks \
+curl -X POST http://localhost:3000/api/columns \
   -H "Content-Type: application/json" \
-  -d '{
-    "id": "task_1707408000_abc123",
-    "status": "today"
-  }'
+  -d '{"name": "Blocked"}'
 ```
 
-### Get All Tasks
+### Rename a column
+```bash
+curl -X PUT http://localhost:3000/api/columns/blocked \
+  -H "Content-Type: application/json" \
+  -d '{"name": "On Hold"}'
+```
+
+### Reorder columns (bulk)
+```bash
+curl -X PUT http://localhost:3000/api/columns \
+  -H "Content-Type: application/json" \
+  -d '[{"id":"today","order":0},{"id":"this-week","order":1},{"id":"blocked","order":2},{"id":"later","order":3},{"id":"done","order":4}]'
+```
+
+### Delete a column
+Tasks in the deleted column move to Inbox automatically.
+```bash
+curl -X DELETE http://localhost:3000/api/columns/blocked
+```
+
+---
+
+## Tasks API
+
+### List all tasks
 ```bash
 curl http://localhost:3000/api/tasks
 ```
 
-### Get Single Task
+### Create a task
 ```bash
-curl http://localhost:3000/api/tasks/task_1707408000_abc123
+curl -X POST http://localhost:3000/api/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Review PR #42","priority":"high","status":"today"}'
 ```
 
-### Delete Task
+Status can be `inbox`, any column ID, or `done`. Priority: `low`, `medium`, `high`, `urgent`.
+
+### Move a task
 ```bash
-curl -X DELETE http://localhost:3000/api/tasks/task_1707408000_abc123
+curl -X PUT http://localhost:3000/api/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"id":"task_123","status":"done"}'
 ```
 
-## Activity Feed
+### Delete a task
+```bash
+curl -X DELETE http://localhost:3000/api/tasks/task_123
+```
 
-### Post Activity Update
+---
+
+## Activities API
+
+### Post an update
 ```bash
 curl -X POST http://localhost:3000/api/activities \
   -H "Content-Type: application/json" \
-  -d '{
-    "type": "progress",
-    "content": "Completed 3 tasks this morning. Moving email campaign to review.",
-    "author": "AI Employee"
-  }'
+  -d '{"type":"checkin","content":"Morning check-in: 3 tasks for today","author":"AI Employee"}'
 ```
 
-**Activity Types**: `checkin`, `progress`, `update`, `report`, `completed`, `moved`, `created`
-
-### Get Activities
+### Get activity feed
 ```bash
 curl http://localhost:3000/api/activities
 ```
 
-## Daily Reports
+---
 
-### Get Daily Summary (for evening reports)
-```bash
-curl http://localhost:3000/api/daily-summary
-```
+## Common Workflows
 
-**Response includes:**
-- Tasks completed today
-- Tasks moved between columns
-- Current status breakdown
-- Overdue tasks
-- Activity count
+### Morning routine
+1. `GET /api/tasks` — review all tasks
+2. Move overdue/priority items to `today`
+3. `POST /api/activities` — post morning plan
 
-### Get Morning Update (for daily planning)
-```bash
-curl http://localhost:3000/api/morning-update
-```
+### Evening summary
+1. `GET /api/tasks` — count completed
+2. Move finished items to `done`
+3. `POST /api/activities` — post daily summary
 
-**Response includes:**
-- Today's scheduled tasks
-- Tasks due today
-- Overdue items
-- High priority tasks
-- Inbox items needing attention
-
-## Statistics
-```bash
-curl http://localhost:3000/api/stats
-```
-
-## Typical AI Employee Workflow
-
-### 1. Morning Check-in (8 AM UTC)
-```bash
-# Get morning update
-UPDATE=$(curl -s http://localhost:3000/api/morning-update)
-
-# Post morning summary
-curl -X POST http://localhost:3000/api/activities \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "checkin",
-    "content": "Good morning! Found 5 tasks for today, 2 overdue items need attention. Starting with high priority tasks.",
-    "author": "AI Employee"
-  }'
-```
-
-### 2. Moving Tasks Throughout Day
-```bash
-# Move task from inbox to today
-curl -X PUT http://localhost:3000/api/tasks \
-  -H "Content-Type: application/json" \
-  -d '{"id": "task_123", "status": "today"}'
-
-# Complete a task
-curl -X PUT http://localhost:3000/api/tasks \
-  -H "Content-Type: application/json" \
-  -d '{"id": "task_123", "status": "done"}'
-```
-
-### 3. Evening Summary (6 PM UTC)
-```bash
-# Get daily summary
-SUMMARY=$(curl -s http://localhost:3000/api/daily-summary)
-
-# Post end-of-day report
-curl -X POST http://localhost:3000/api/activities \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "report",
-    "content": "Daily wrap-up: Completed 8 tasks, 2 moved to this-week. Tomorrow: Focus on project proposal and client calls.",
-    "author": "AI Employee"
-  }'
-```
-
-## Task Status Flow
-
-```
-inbox → today → done
-inbox → this-week → today → done  
-inbox → later → this-week → today → done
-```
-
-## Error Handling
-
-All endpoints return:
-- **200/201**: Success
-- **400**: Bad request (missing required fields)
-- **404**: Task not found
-- **500**: Server error
-
-Check the response body for error details:
-```json
-{
-  "error": "Task title is required"
-}
-```
-
-## Tips for AI Employees
-
-1. **Check morning update first** - Sets daily priorities
-2. **Use inbox for triage** - All new tasks go here initially
-3. **Move strategically** - Today = must do today, This Week = can wait a few days
-4. **Post progress updates** - Keep activity feed active
-5. **Evening summary** - Review what was accomplished
-6. **Batch operations** - Update multiple tasks efficiently
-7. **Monitor overdue** - Address these first in morning routine
+### Reorganize board
+1. `POST /api/columns` — add new columns as needed
+2. `PUT /api/columns/:id` — rename existing
+3. `PUT /api/columns` — reorder all at once
+4. `DELETE /api/columns/:id` — remove unused

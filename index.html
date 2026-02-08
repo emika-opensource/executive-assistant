@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Executive Assistant - Mission Control</title>
+    <title>Mission Control</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -11,9 +11,8 @@
 </head>
 <body>
     <div class="app">
-        <!-- Main Content Area -->
         <main class="main">
-            <!-- Inbox Panel (left side) -->
+            <!-- Inbox Panel (left) -->
             <aside class="inbox-panel" id="inbox-panel">
                 <div class="panel-header">
                     <h2>📥 Inbox</h2>
@@ -23,44 +22,12 @@
                 <div class="inbox-list" id="inbox-list"></div>
             </aside>
 
-            <!-- Board (main area) -->
+            <!-- Board (main area) — columns rendered dynamically -->
             <section class="board-area" id="board-area">
-                <div class="board-columns">
-                    <div class="column" data-status="today">
-                        <div class="column-header">
-                            <h3>Today</h3>
-                            <span class="col-count" id="today-count">0</span>
-                            <button class="add-btn" data-column="today" title="Add to Today">+</button>
-                        </div>
-                        <div class="column-content" id="today-column"></div>
-                    </div>
-
-                    <div class="column" data-status="this-week">
-                        <div class="column-header">
-                            <h3>This Week</h3>
-                            <span class="col-count" id="this-week-count">0</span>
-                            <button class="add-btn" data-column="this-week" title="Add to This Week">+</button>
-                        </div>
-                        <div class="column-content" id="this-week-column"></div>
-                    </div>
-
-                    <div class="column" data-status="later">
-                        <div class="column-header">
-                            <h3>Later</h3>
-                            <span class="col-count" id="later-count">0</span>
-                            <button class="add-btn" data-column="later" title="Add to Later">+</button>
-                        </div>
-                        <div class="column-content" id="later-column"></div>
-                    </div>
-
-                    <div class="column column-done" data-status="done">
-                        <div class="column-header">
-                            <h3>Done</h3>
-                            <span class="col-count" id="done-count">0</span>
-                        </div>
-                        <div class="column-content" id="done-column"></div>
-                    </div>
+                <div class="board-top">
+                    <button class="add-col-btn" id="add-col-btn" title="Add column">+ Column</button>
                 </div>
+                <div class="board-columns" id="board-columns"></div>
             </section>
         </main>
 
@@ -96,7 +63,7 @@
                     </div>
                     <div class="form-row">
                         <div class="form-group">
-                            <select id="task-priority" required>
+                            <select id="task-priority">
                                 <option value="low">Low</option>
                                 <option value="medium" selected>Medium</option>
                                 <option value="high">High</option>
@@ -104,13 +71,7 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <select id="task-status">
-                                <option value="inbox">Inbox</option>
-                                <option value="today">Today</option>
-                                <option value="this-week">This Week</option>
-                                <option value="later">Later</option>
-                                <option value="done">Done</option>
-                            </select>
+                            <select id="task-status"></select>
                         </div>
                     </div>
                     <div class="form-group">
@@ -120,8 +81,27 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" id="cancel-task">Cancel</button>
-                <button type="button" class="btn btn-danger" id="delete-task" style="display: none;">Delete</button>
+                <button type="button" class="btn btn-danger" id="delete-task" style="display:none">Delete</button>
                 <button type="submit" form="task-form" class="btn btn-primary" id="save-task">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Column Modal (rename/delete) -->
+    <div class="modal" id="col-modal">
+        <div class="modal-content modal-sm">
+            <div class="modal-header">
+                <h3 id="col-modal-title">Edit Column</h3>
+                <button class="modal-close" id="col-modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <input type="text" id="col-name-input" placeholder="Column name">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" id="col-delete-btn">Delete</button>
+                <button class="btn btn-primary" id="col-save-btn">Save</button>
             </div>
         </div>
     </div>
