@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Executive Assistant - Mission Control</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app">
+        <!-- Header with Quick Stats -->
+        <header class="header">
+            <div class="header-left">
+                <h1 class="logo">Executive Assistant</h1>
+                <span class="subtitle">Mission Control</span>
+            </div>
+            
+            <div class="quick-stats">
+                <div class="stat-item">
+                    <span class="stat-value" id="total-tasks">0</span>
+                    <span class="stat-label">Total Tasks</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="completed-today">0</span>
+                    <span class="stat-label">Completed Today</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="in-progress">0</span>
+                    <span class="stat-label">In Progress</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value overdue" id="overdue">0</span>
+                    <span class="stat-label">Overdue</span>
+                </div>
+            </div>
+
+            <div class="header-right">
+                <button class="theme-toggle" id="theme-toggle" title="Toggle theme">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <circle cx="12" cy="12" r="5"/>
+                        <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                    </svg>
+                </button>
+                <button class="new-task-btn" id="new-task-btn">+ New Task</button>
+            </div>
+        </header>
+
+        <main class="main">
+            <!-- Kanban Board -->
+            <div class="kanban-board">
+                <div class="board-header">
+                    <div class="board-title">
+                        <h2>Task Board</h2>
+                        <div class="board-filters">
+                            <select id="priority-filter" class="filter-select">
+                                <option value="">All Priorities</option>
+                                <option value="urgent">Urgent</option>
+                                <option value="high">High</option>
+                                <option value="medium">Medium</option>
+                                <option value="low">Low</option>
+                            </select>
+                            <input type="text" placeholder="Search tasks..." class="search-input" id="search-input">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="board-columns">
+                    <div class="column" data-status="backlog">
+                        <div class="column-header">
+                            <h3>Backlog</h3>
+                            <span class="task-count" id="backlog-count">0</span>
+                        </div>
+                        <div class="column-content" data-status="backlog"></div>
+                    </div>
+
+                    <div class="column" data-status="in-progress">
+                        <div class="column-header">
+                            <h3>In Progress</h3>
+                            <span class="task-count" id="in-progress-count">0</span>
+                        </div>
+                        <div class="column-content" data-status="in-progress"></div>
+                    </div>
+
+                    <div class="column" data-status="review">
+                        <div class="column-header">
+                            <h3>Review</h3>
+                            <span class="task-count" id="review-count">0</span>
+                        </div>
+                        <div class="column-content" data-status="review"></div>
+                    </div>
+
+                    <div class="column" data-status="done">
+                        <div class="column-header">
+                            <h3>Done</h3>
+                            <span class="task-count" id="done-count">0</span>
+                        </div>
+                        <div class="column-content" data-status="done"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI Activity Feed -->
+            <aside class="activity-feed">
+                <div class="feed-header">
+                    <h3>AI Activity</h3>
+                    <div class="activity-badge" id="activity-badge">0</div>
+                </div>
+                <div class="feed-content" id="activity-list">
+                    <!-- Activity items will be populated by JavaScript -->
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <!-- Task Modal -->
+    <div class="modal" id="task-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">New Task</h3>
+                <button class="modal-close" id="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="task-form">
+                    <input type="hidden" id="task-id">
+                    
+                    <div class="form-group">
+                        <label for="task-title">Title</label>
+                        <input type="text" id="task-title" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="task-description">Description</label>
+                        <textarea id="task-description" rows="3"></textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="task-priority">Priority</label>
+                            <select id="task-priority" required>
+                                <option value="low">Low</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="high">High</option>
+                                <option value="urgent">Urgent</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="task-due-date">Due Date</label>
+                            <input type="datetime-local" id="task-due-date">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="task-assignee">Assignee</label>
+                        <input type="text" id="task-assignee" placeholder="AI Employee">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="task-status">Status</label>
+                        <select id="task-status">
+                            <option value="backlog" selected>Backlog</option>
+                            <option value="in-progress">In Progress</option>
+                            <option value="review">Review</option>
+                            <option value="done">Done</option>
+                        </select>
+                    </div>
+                </form>
+
+                <div class="comments-section" id="comments-section" style="display: none;">
+                    <h4>Comments</h4>
+                    <div class="comments-list" id="comments-list"></div>
+                    <div class="comment-form">
+                        <textarea id="new-comment" placeholder="Add a comment..." rows="2"></textarea>
+                        <button type="button" id="add-comment">Add Comment</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" id="cancel-task">Cancel</button>
+                <button type="button" class="btn-danger" id="delete-task" style="display: none;">Delete</button>
+                <button type="submit" form="task-form" class="btn-primary" id="save-task">Save Task</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
