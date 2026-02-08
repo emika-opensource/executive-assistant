@@ -11,30 +11,25 @@
 </head>
 <body>
     <div class="app">
-        <!-- Main Header -->
-        <header class="header">
-            <h1 class="board-title">Executive Assistant</h1>
-        </header>
-
         <!-- Main Content Area -->
-        <main class="main" id="main-content">
-            <!-- Inbox View -->
-            <div class="inbox-view" id="inbox-view">
-                <div class="view-header">
-                    <h2>Inbox</h2>
-                    <button class="add-btn" id="add-inbox-btn" title="Add new task">+</button>
+        <main class="main">
+            <!-- Inbox Panel (left side) -->
+            <aside class="inbox-panel" id="inbox-panel">
+                <div class="panel-header">
+                    <h2>📥 Inbox</h2>
+                    <button class="add-btn" id="add-inbox-btn" title="Add to Inbox">+</button>
                 </div>
-                <div class="inbox-list" id="inbox-list">
-                    <!-- Inbox items will be populated here -->
-                </div>
-            </div>
+                <div class="inbox-hint">Everything new lands here</div>
+                <div class="inbox-list" id="inbox-list"></div>
+            </aside>
 
-            <!-- Board View -->
-            <div class="board-view" id="board-view" style="display: none;">
+            <!-- Board (main area) -->
+            <section class="board-area" id="board-area">
                 <div class="board-columns">
                     <div class="column" data-status="today">
                         <div class="column-header">
                             <h3>Today</h3>
+                            <span class="col-count" id="today-count">0</span>
                             <button class="add-btn" data-column="today" title="Add to Today">+</button>
                         </div>
                         <div class="column-content" id="today-column"></div>
@@ -43,6 +38,7 @@
                     <div class="column" data-status="this-week">
                         <div class="column-header">
                             <h3>This Week</h3>
+                            <span class="col-count" id="this-week-count">0</span>
                             <button class="add-btn" data-column="this-week" title="Add to This Week">+</button>
                         </div>
                         <div class="column-content" id="this-week-column"></div>
@@ -51,40 +47,36 @@
                     <div class="column" data-status="later">
                         <div class="column-header">
                             <h3>Later</h3>
+                            <span class="col-count" id="later-count">0</span>
                             <button class="add-btn" data-column="later" title="Add to Later">+</button>
                         </div>
                         <div class="column-content" id="later-column"></div>
                     </div>
+
+                    <div class="column column-done" data-status="done">
+                        <div class="column-header">
+                            <h3>Done</h3>
+                            <span class="col-count" id="done-count">0</span>
+                        </div>
+                        <div class="column-content" id="done-column"></div>
+                    </div>
                 </div>
-            </div>
+            </section>
         </main>
 
         <!-- Bottom Tab Bar -->
         <nav class="bottom-tabs">
-            <button class="tab-btn active" data-view="inbox">
+            <button class="tab-btn active" data-panel="inbox">
                 <span class="tab-icon">📥</span>
                 <span class="tab-label">Inbox</span>
+                <span class="tab-badge" id="inbox-badge" style="display:none">0</span>
             </button>
-            <button class="tab-btn" data-view="board">
+            <button class="tab-btn active" data-panel="board">
                 <span class="tab-icon">📋</span>
                 <span class="tab-label">Board</span>
             </button>
         </nav>
     </div>
-
-    <!-- Task Card Template -->
-    <template id="task-card-template">
-        <div class="task-card" draggable="true">
-            <div class="task-header">
-                <div class="priority-dot"></div>
-                <div class="task-title"></div>
-            </div>
-            <div class="task-meta">
-                <span class="task-due"></span>
-                <span class="task-assignee"></span>
-            </div>
-        </div>
-    </template>
 
     <!-- Task Modal -->
     <div class="modal" id="task-modal">
@@ -96,20 +88,14 @@
             <div class="modal-body">
                 <form id="task-form">
                     <input type="hidden" id="task-id">
-                    
                     <div class="form-group">
-                        <label for="task-title">Title</label>
-                        <input type="text" id="task-title" required placeholder="Enter task title">
+                        <input type="text" id="task-title" required placeholder="Task title">
                     </div>
-
                     <div class="form-group">
-                        <label for="task-description">Description</label>
-                        <textarea id="task-description" rows="3" placeholder="Optional description"></textarea>
+                        <textarea id="task-description" rows="2" placeholder="Description (optional)"></textarea>
                     </div>
-
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="task-priority">Priority</label>
                             <select id="task-priority" required>
                                 <option value="low">Low</option>
                                 <option value="medium" selected>Medium</option>
@@ -117,34 +103,25 @@
                                 <option value="urgent">Urgent</option>
                             </select>
                         </div>
-
                         <div class="form-group">
-                            <label for="task-due-date">Due Date</label>
-                            <input type="datetime-local" id="task-due-date">
+                            <select id="task-status">
+                                <option value="inbox">Inbox</option>
+                                <option value="today">Today</option>
+                                <option value="this-week">This Week</option>
+                                <option value="later">Later</option>
+                                <option value="done">Done</option>
+                            </select>
                         </div>
                     </div>
-
                     <div class="form-group">
-                        <label for="task-assignee">Assignee</label>
-                        <input type="text" id="task-assignee" placeholder="AI Employee" value="AI Employee">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="task-status">Status</label>
-                        <select id="task-status">
-                            <option value="inbox" selected>Inbox</option>
-                            <option value="today">Today</option>
-                            <option value="this-week">This Week</option>
-                            <option value="later">Later</option>
-                            <option value="done">Done</option>
-                        </select>
+                        <input type="datetime-local" id="task-due-date">
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" id="cancel-task">Cancel</button>
                 <button type="button" class="btn btn-danger" id="delete-task" style="display: none;">Delete</button>
-                <button type="submit" form="task-form" class="btn btn-primary" id="save-task">Save Task</button>
+                <button type="submit" form="task-form" class="btn btn-primary" id="save-task">Save</button>
             </div>
         </div>
     </div>

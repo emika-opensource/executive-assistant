@@ -1,445 +1,281 @@
-// Executive Assistant Mission Control - Main JavaScript
+// Executive Assistant Mission Control
 
 class MissionControl {
     constructor() {
         this.tasks = [];
-        this.currentView = 'inbox';
         this.draggedTask = null;
-        this.taskModal = null;
         this.init();
     }
 
     async init() {
         this.setupElements();
         this.setupEventListeners();
+        this.setupDragDrop();
         await this.loadTasks();
-        this.renderTasks();
+        this.render();
     }
 
     setupElements() {
-        // Views
-        this.inboxView = document.getElementById('inbox-view');
-        this.boardView = document.getElementById('board-view');
-        
-        // Containers
+        this.inboxPanel = document.getElementById('inbox-panel');
+        this.boardArea = document.getElementById('board-area');
         this.inboxList = document.getElementById('inbox-list');
-        this.todayColumn = document.getElementById('today-column');
-        this.thisWeekColumn = document.getElementById('this-week-column');
-        this.laterColumn = document.getElementById('later-column');
-        
-        // Modal
         this.taskModal = document.getElementById('task-modal');
         this.taskForm = document.getElementById('task-form');
-        
-        // Buttons
-        this.tabButtons = document.querySelectorAll('.tab-btn');
-        this.addButtons = document.querySelectorAll('.add-btn');
-        this.modalClose = document.getElementById('modal-close');
-        this.cancelTask = document.getElementById('cancel-task');
-        this.deleteTask = document.getElementById('delete-task');
-        this.saveTask = document.getElementById('save-task');
     }
 
     setupEventListeners() {
-        // Tab switching
-        this.tabButtons.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const view = e.currentTarget.dataset.view;
-                this.switchView(view);
+        // Tab toggles — each toggles its own panel independently
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const panel = btn.dataset.panel;
+                btn.classList.toggle('active');
+                if (panel === 'inbox') {
+                    this.inboxPanel.classList.toggle('hidden');
+                } else if (panel === 'board') {
+                    this.boardArea.classList.toggle('hidden');
+                }
             });
         });
 
-        // Add task buttons
-        this.addButtons.forEach(btn => {
+        // Add buttons
+        document.querySelectorAll('.add-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                const column = e.currentTarget.dataset.column || 'inbox';
-                this.openTaskModal(null, column);
+                e.stopPropagation();
+                const col = btn.dataset.column || 'inbox';
+                this.openModal(null, col);
             });
         });
 
-        // Modal events
-        this.modalClose.addEventListener('click', () => this.closeTaskModal());
-        this.cancelTask.addEventListener('click', () => this.closeTaskModal());
-        this.deleteTask.addEventListener('click', () => this.deleteCurrentTask());
-        this.taskForm.addEventListener('submit', (e) => this.saveCurrentTask(e));
-
-        // Click outside modal to close
+        // Modal
+        document.getElementById('modal-close').addEventListener('click', () => this.closeModal());
+        document.getElementById('cancel-task').addEventListener('click', () => this.closeModal());
+        document.getElementById('delete-task').addEventListener('click', () => this.deleteCurrent());
+        this.taskForm.addEventListener('submit', (e) => this.saveCurrent(e));
         this.taskModal.addEventListener('click', (e) => {
-            if (e.target === this.taskModal) {
-                this.closeTaskModal();
-            }
+            if (e.target === this.taskModal) this.closeModal();
         });
-
-        // Escape key to close modal
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && this.taskModal.classList.contains('show')) {
-                this.closeTaskModal();
+            if (e.key === 'Escape') this.closeModal();
+        });
+    }
+
+    setupDragDrop() {
+        // Delegate drag events on column-content elements and inbox-list
+        const dropZones = () => [...document.querySelectorAll('.column-content'), this.inboxList];
+
+        document.addEventListener('dragover', (e) => {
+            const zone = e.target.closest('.column-content, .inbox-list');
+            if (zone) e.preventDefault();
+        });
+
+        document.addEventListener('dragenter', (e) => {
+            const zone = e.target.closest('.column-content, .inbox-list');
+            if (zone) zone.classList.add('drag-over');
+        });
+
+        document.addEventListener('dragleave', (e) => {
+            const zone = e.target.closest('.column-content, .inbox-list');
+            if (zone && !zone.contains(e.relatedTarget)) {
+                zone.classList.remove('drag-over');
             }
         });
-    }
 
-    switchView(view) {
-        // Update active tab
-        this.tabButtons.forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.view === view);
+        document.addEventListener('drop', async (e) => {
+            const zone = e.target.closest('.column-content, .inbox-list');
+            if (!zone || !this.draggedTask) return;
+            e.preventDefault();
+            zone.classList.remove('drag-over');
+
+            // Determine target status
+            let newStatus;
+            if (zone.classList.contains('inbox-list')) {
+                newStatus = 'inbox';
+            } else {
+                newStatus = zone.closest('.column')?.dataset.status;
+            }
+            if (newStatus && newStatus !== this.draggedTask.status) {
+                await this.moveTask(this.draggedTask.id, newStatus);
+            }
+            this.draggedTask = null;
         });
-
-        // Show/hide views
-        this.inboxView.style.display = view === 'inbox' ? 'block' : 'none';
-        this.boardView.style.display = view === 'board' ? 'block' : 'none';
-
-        this.currentView = view;
     }
+
+    // ── Data ──
 
     async loadTasks() {
         try {
-            const response = await fetch('/api/tasks');
-            if (response.ok) {
-                this.tasks = await response.json();
-            } else {
-                console.error('Failed to load tasks:', response.statusText);
-                this.tasks = [];
-            }
-        } catch (error) {
-            console.error('Error loading tasks:', error);
-            this.tasks = [];
-        }
+            const res = await fetch('/api/tasks');
+            this.tasks = res.ok ? await res.json() : [];
+        } catch { this.tasks = []; }
     }
 
-    renderTasks() {
-        // Clear all containers
-        this.inboxList.innerHTML = '';
-        this.todayColumn.innerHTML = '';
-        this.thisWeekColumn.innerHTML = '';
-        this.laterColumn.innerHTML = '';
-
-        // Filter and render tasks by status
-        const inboxTasks = this.tasks.filter(t => t.status === 'inbox');
-        const todayTasks = this.tasks.filter(t => t.status === 'today');
-        const thisWeekTasks = this.tasks.filter(t => t.status === 'this-week');
-        const laterTasks = this.tasks.filter(t => t.status === 'later');
-
-        // Render each group
-        this.renderTaskGroup(inboxTasks, this.inboxList);
-        this.renderTaskGroup(todayTasks, this.todayColumn);
-        this.renderTaskGroup(thisWeekTasks, this.thisWeekColumn);
-        this.renderTaskGroup(laterTasks, this.laterColumn);
-
-        // Show empty states
-        this.showEmptyStateIfNeeded(this.inboxList, 'inbox');
-        this.showEmptyStateIfNeeded(this.todayColumn, 'today');
-        this.showEmptyStateIfNeeded(this.thisWeekColumn, 'this-week');
-        this.showEmptyStateIfNeeded(this.laterColumn, 'later');
+    async moveTask(id, status) {
+        const task = this.tasks.find(t => t.id === id);
+        if (!task) return;
+        try {
+            const res = await fetch('/api/tasks', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...task, status })
+            });
+            if (res.ok) { Object.assign(task, await res.json()); this.render(); }
+        } catch (e) { console.error('Move failed:', e); }
     }
 
-    renderTaskGroup(tasks, container) {
-        tasks.forEach(task => {
-            const taskCard = this.createTaskCard(task);
-            container.appendChild(taskCard);
+    // ── Rendering ──
+
+    render() {
+        const groups = { inbox: [], today: [], 'this-week': [], later: [], done: [] };
+        this.tasks.forEach(t => {
+            if (groups[t.status]) groups[t.status].push(t);
+            else groups.inbox.push(t); // unknown status → inbox
         });
+
+        this.renderList(this.inboxList, groups.inbox, 'No new tasks');
+        this.renderList(document.getElementById('today-column'), groups.today, 'Nothing for today');
+        this.renderList(document.getElementById('this-week-column'), groups['this-week'], 'Nothing this week');
+        this.renderList(document.getElementById('later-column'), groups.later, 'Nothing planned');
+        this.renderList(document.getElementById('done-column'), groups.done, 'No completed tasks');
+
+        // Update counts
+        document.getElementById('today-count').textContent = groups.today.length;
+        document.getElementById('this-week-count').textContent = groups['this-week'].length;
+        document.getElementById('later-count').textContent = groups.later.length;
+        document.getElementById('done-count').textContent = groups.done.length;
+
+        // Inbox badge
+        const badge = document.getElementById('inbox-badge');
+        if (groups.inbox.length > 0) {
+            badge.textContent = groups.inbox.length;
+            badge.style.display = 'flex';
+        } else {
+            badge.style.display = 'none';
+        }
     }
 
-    createTaskCard(task) {
-        const template = document.getElementById('task-card-template');
-        const card = template.content.cloneNode(true).querySelector('.task-card');
-        
-        // Set task data
+    renderList(container, tasks, emptyText) {
+        container.innerHTML = '';
+        if (tasks.length === 0) {
+            container.innerHTML = `<div class="empty-state">${emptyText}</div>`;
+            return;
+        }
+        tasks.forEach(task => container.appendChild(this.createCard(task)));
+    }
+
+    createCard(task) {
+        const card = document.createElement('div');
+        card.className = 'task-card' + (task.status === 'done' ? ' done-card' : '');
+        card.draggable = true;
         card.dataset.taskId = task.id;
-        card.dataset.status = task.status;
 
-        // Set priority dot
-        const priorityDot = card.querySelector('.priority-dot');
-        priorityDot.classList.add(task.priority || 'medium');
+        let meta = '';
+        if (task.dueDate) meta += `<span>${this.fmtDate(new Date(task.dueDate))}</span>`;
 
-        // Set title
-        const title = card.querySelector('.task-title');
-        title.textContent = task.title;
+        card.innerHTML = `
+            <div class="task-header">
+                <div class="priority-dot ${task.priority || 'medium'}"></div>
+                <div class="task-title">${this.esc(task.title)}</div>
+            </div>
+            ${meta ? `<div class="task-meta">${meta}</div>` : ''}
+        `;
 
-        // Set meta info
-        const due = card.querySelector('.task-due');
-        const assignee = card.querySelector('.task-assignee');
-        
-        if (task.dueDate) {
-            const dueDate = new Date(task.dueDate);
-            due.textContent = this.formatDueDate(dueDate);
-        }
-        
-        if (task.assignee) {
-            assignee.textContent = task.assignee;
-        }
-
-        // Add event listeners
-        card.addEventListener('click', () => this.openTaskModal(task));
-        card.addEventListener('dragstart', (e) => this.onDragStart(e, task));
-        card.addEventListener('dragend', () => this.onDragEnd());
+        card.addEventListener('click', () => this.openModal(task));
+        card.addEventListener('dragstart', (e) => {
+            this.draggedTask = task;
+            card.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        });
+        card.addEventListener('dragend', () => {
+            card.classList.remove('dragging');
+            document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+        });
 
         return card;
     }
 
-    showEmptyStateIfNeeded(container, type) {
-        if (container.children.length === 0) {
-            const emptyState = document.createElement('div');
-            emptyState.className = 'empty-state';
-            
-            let icon, text;
-            switch (type) {
-                case 'inbox':
-                    icon = '📥';
-                    text = 'No new tasks in inbox';
-                    break;
-                case 'today':
-                    icon = '📅';
-                    text = 'Nothing scheduled for today';
-                    break;
-                case 'this-week':
-                    icon = '📆';
-                    text = 'Nothing planned this week';
-                    break;
-                case 'later':
-                    icon = '📋';
-                    text = 'No future tasks';
-                    break;
-                default:
-                    icon = '✅';
-                    text = 'All clear!';
-            }
-
-            emptyState.innerHTML = `
-                <div class="empty-state-icon">${icon}</div>
-                <div class="empty-state-text">${text}</div>
-            `;
-
-            container.appendChild(emptyState);
-        }
-    }
-
-    formatDueDate(date) {
+    fmtDate(d) {
         const now = new Date();
-        const diffTime = date - now;
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-        if (diffDays < 0) return 'Overdue';
-        if (diffDays === 0) return 'Today';
-        if (diffDays === 1) return 'Tomorrow';
-        if (diffDays < 7) return `${diffDays} days`;
-        
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const diff = Math.ceil((d - now) / 86400000);
+        if (diff < 0) return '<span style="color:#ef4444">Overdue</span>';
+        if (diff === 0) return 'Today';
+        if (diff === 1) return 'Tomorrow';
+        if (diff < 7) return `${diff}d`;
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     }
 
-    onDragStart(e, task) {
-        this.draggedTask = task;
-        e.currentTarget.classList.add('dragging');
-        
-        // Set up drop zones
-        document.querySelectorAll('.column-content').forEach(column => {
-            column.addEventListener('dragover', this.onDragOver.bind(this));
-            column.addEventListener('drop', this.onDrop.bind(this));
-            column.addEventListener('dragenter', this.onDragEnter.bind(this));
-            column.addEventListener('dragleave', this.onDragLeave.bind(this));
-        });
-    }
+    esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-    onDragEnd() {
-        document.querySelector('.dragging')?.classList.remove('dragging');
-        document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-        
-        // Clean up drop zones
-        document.querySelectorAll('.column-content').forEach(column => {
-            column.removeEventListener('dragover', this.onDragOver.bind(this));
-            column.removeEventListener('drop', this.onDrop.bind(this));
-            column.removeEventListener('dragenter', this.onDragEnter.bind(this));
-            column.removeEventListener('dragleave', this.onDragLeave.bind(this));
-        });
-        
-        this.draggedTask = null;
-    }
+    // ── Modal ──
 
-    onDragOver(e) {
-        e.preventDefault();
-    }
+    openModal(task = null, defaultStatus = 'inbox') {
+        const edit = !!task;
+        document.getElementById('modal-title').textContent = edit ? 'Edit Task' : 'New Task';
+        document.getElementById('delete-task').style.display = edit ? 'block' : 'none';
 
-    onDragEnter(e) {
-        e.currentTarget.classList.add('drag-over');
-    }
-
-    onDragLeave(e) {
-        if (!e.currentTarget.contains(e.relatedTarget)) {
-            e.currentTarget.classList.remove('drag-over');
-        }
-    }
-
-    async onDrop(e) {
-        e.preventDefault();
-        e.currentTarget.classList.remove('drag-over');
-
-        if (!this.draggedTask) return;
-
-        const targetColumn = e.currentTarget.parentElement;
-        const newStatus = targetColumn.dataset.status;
-
-        if (newStatus && this.draggedTask.status !== newStatus) {
-            await this.moveTask(this.draggedTask.id, newStatus);
-        }
-    }
-
-    async moveTask(taskId, newStatus) {
-        try {
-            const task = this.tasks.find(t => t.id === taskId);
-            if (!task) return;
-
-            const updatedTask = { ...task, status: newStatus };
-            
-            const response = await fetch('/api/tasks', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updatedTask)
-            });
-
-            if (response.ok) {
-                const result = await response.json();
-                this.updateTaskInMemory(result);
-                this.renderTasks();
-            } else {
-                console.error('Failed to move task:', response.statusText);
-            }
-        } catch (error) {
-            console.error('Error moving task:', error);
-        }
-    }
-
-    openTaskModal(task = null, defaultStatus = 'inbox') {
-        const isEdit = task !== null;
-        
-        // Set modal title
-        document.getElementById('modal-title').textContent = isEdit ? 'Edit Task' : 'New Task';
-        
-        // Show/hide delete button
-        this.deleteTask.style.display = isEdit ? 'block' : 'none';
-        
-        // Fill form
-        if (isEdit) {
+        if (edit) {
             document.getElementById('task-id').value = task.id;
             document.getElementById('task-title').value = task.title;
             document.getElementById('task-description').value = task.description || '';
             document.getElementById('task-priority').value = task.priority || 'medium';
-            document.getElementById('task-assignee').value = task.assignee || '';
             document.getElementById('task-status').value = task.status || 'inbox';
-            
             if (task.dueDate) {
-                // Convert to datetime-local format
-                const date = new Date(task.dueDate);
-                const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-                document.getElementById('task-due-date').value = localDate.toISOString().slice(0, 16);
+                const d = new Date(task.dueDate);
+                document.getElementById('task-due-date').value = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
             } else {
                 document.getElementById('task-due-date').value = '';
             }
         } else {
             this.taskForm.reset();
+            document.getElementById('task-id').value = '';
             document.getElementById('task-status').value = defaultStatus;
-            document.getElementById('task-assignee').value = 'AI Employee';
         }
-        
-        // Show modal
+
         this.taskModal.classList.add('show');
         document.getElementById('task-title').focus();
     }
 
-    closeTaskModal() {
+    closeModal() {
         this.taskModal.classList.remove('show');
-        this.taskForm.reset();
     }
 
-    async saveCurrentTask(e) {
+    async saveCurrent(e) {
         e.preventDefault();
-        
-        const taskData = {
+        const data = {
             title: document.getElementById('task-title').value.trim(),
             description: document.getElementById('task-description').value.trim(),
             priority: document.getElementById('task-priority').value,
             status: document.getElementById('task-status').value,
-            assignee: document.getElementById('task-assignee').value.trim(),
         };
+        const due = document.getElementById('task-due-date').value;
+        if (due) data.dueDate = new Date(due).toISOString();
 
-        const dueDateValue = document.getElementById('task-due-date').value;
-        if (dueDateValue) {
-            taskData.dueDate = new Date(dueDateValue).toISOString();
-        }
-
-        const taskId = document.getElementById('task-id').value;
-        const isEdit = Boolean(taskId);
-
+        const id = document.getElementById('task-id').value;
         try {
-            let response;
-            if (isEdit) {
-                taskData.id = taskId;
-                response = await fetch('/api/tasks', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(taskData)
-                });
-            } else {
-                response = await fetch('/api/tasks', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(taskData)
-                });
+            const res = id
+                ? await fetch('/api/tasks', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...data, id }) })
+                : await fetch('/api/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+            if (res.ok) {
+                const result = await res.json();
+                const idx = this.tasks.findIndex(t => t.id === result.id);
+                if (idx >= 0) this.tasks[idx] = result; else this.tasks.push(result);
+                this.render();
+                this.closeModal();
             }
-
-            if (response.ok) {
-                const result = await response.json();
-                this.updateTaskInMemory(result);
-                this.renderTasks();
-                this.closeTaskModal();
-            } else {
-                console.error('Failed to save task:', response.statusText);
-                alert('Failed to save task. Please try again.');
-            }
-        } catch (error) {
-            console.error('Error saving task:', error);
-            alert('Error saving task. Please try again.');
-        }
+        } catch (e) { console.error('Save failed:', e); }
     }
 
-    async deleteCurrentTask() {
-        const taskId = document.getElementById('task-id').value;
-        if (!taskId) return;
-
-        if (!confirm('Are you sure you want to delete this task?')) return;
-
+    async deleteCurrent() {
+        const id = document.getElementById('task-id').value;
+        if (!id || !confirm('Delete this task?')) return;
         try {
-            const response = await fetch(`/api/tasks/${taskId}`, {
-                method: 'DELETE'
-            });
-
-            if (response.ok) {
-                this.removeTaskFromMemory(taskId);
-                this.renderTasks();
-                this.closeTaskModal();
-            } else {
-                console.error('Failed to delete task:', response.statusText);
-                alert('Failed to delete task. Please try again.');
+            const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                this.tasks = this.tasks.filter(t => t.id !== id);
+                this.render();
+                this.closeModal();
             }
-        } catch (error) {
-            console.error('Error deleting task:', error);
-            alert('Error deleting task. Please try again.');
-        }
-    }
-
-    updateTaskInMemory(updatedTask) {
-        const index = this.tasks.findIndex(t => t.id === updatedTask.id);
-        if (index >= 0) {
-            this.tasks[index] = updatedTask;
-        } else {
-            this.tasks.push(updatedTask);
-        }
-    }
-
-    removeTaskFromMemory(taskId) {
-        this.tasks = this.tasks.filter(t => t.id !== taskId);
+        } catch (e) { console.error('Delete failed:', e); }
     }
 }
 
-// Initialize the application when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    window.missionControl = new MissionControl();
-});
+document.addEventListener('DOMContentLoaded', () => { window.mc = new MissionControl(); });
