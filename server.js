@@ -130,7 +130,7 @@ app.post('/api/tasks', async (req, res) => {
             title: req.body.title,
             description: req.body.description || '',
             priority: req.body.priority || 'medium',
-            status: req.body.status || 'backlog',
+            status: req.body.status || 'inbox',
             assignee: req.body.assignee || '',
             dueDate: req.body.dueDate || null,
             createdAt: new Date().toISOString(),
@@ -290,9 +290,10 @@ app.get('/api/stats', async (req, res) => {
         const stats = {
             total: tasks.length,
             byStatus: {
-                backlog: tasks.filter(t => t.status === 'backlog').length,
-                'in-progress': tasks.filter(t => t.status === 'in-progress').length,
-                review: tasks.filter(t => t.status === 'review').length,
+                inbox: tasks.filter(t => t.status === 'inbox').length,
+                today: tasks.filter(t => t.status === 'today').length,
+                'this-week': tasks.filter(t => t.status === 'this-week').length,
+                later: tasks.filter(t => t.status === 'later').length,
                 done: tasks.filter(t => t.status === 'done').length
             },
             byPriority: {
@@ -315,6 +316,151 @@ app.get('/api/stats', async (req, res) => {
     } catch (error) {
         console.error('Error calculating stats:', error);
         res.status(500).json({ error: 'Failed to calculate statistics' });
+    }
+});
+
+// Daily summary endpoint for AI Employee
+app.get('/api/daily-summary', async (req, res) => {
+    try {
+        const tasks = await loadTasks();
+        const activities = await loadActivities();
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        
+        // Tasks completed today
+        const completedToday = tasks.filter(t => 
+            t.status === 'done' && 
+            new Date(t.updatedAt) >= todayStart
+        );
+        
+        // Tasks that moved today
+        const movedToday = tasks.filter(t => 
+            new Date(t.updatedAt) >= todayStart
+        );
+        
+        // Tasks by current status
+        const tasksByStatus = {
+            inbox: tasks.filter(t => t.status === 'inbox').length,
+            today: tasks.filter(t => t.status === 'today').length,
+            'this-week': tasks.filter(t => t.status === 'this-week').length,
+            later: tasks.filter(t => t.status === 'later').length,
+            done: tasks.filter(t => t.status === 'done').length
+        };
+        
+        // Overdue tasks
+        const overdue = tasks.filter(t => {
+            if (t.status === 'done' || !t.dueDate) return false;
+            return new Date(t.dueDate) < now;
+        });
+        
+        // Today's activities
+        const todayActivities = activities.filter(a => 
+            new Date(a.createdAt) >= todayStart
+        );
+        
+        const summary = {
+            date: now.toISOString().split('T')[0],
+            completedToday: completedToday.length,
+            movedToday: movedToday.length,
+            tasksByStatus,
+            overdueTasks: overdue.length,
+            activitiesCount: todayActivities.length,
+            completedTasks: completedToday.map(t => ({
+                id: t.id,
+                title: t.title,
+                priority: t.priority
+            })),
+            overdueTasks: overdue.map(t => ({
+                id: t.id,
+                title: t.title,
+                dueDate: t.dueDate,
+                priority: t.priority
+            }))
+        };
+        
+        res.json(summary);
+    } catch (error) {
+        console.error('Error generating daily summary:', error);
+        res.status(500).json({ error: 'Failed to generate daily summary' });
+    }
+});
+
+// Morning update endpoint for AI Employee
+app.get('/api/morning-update', async (req, res) => {
+    try {
+        const tasks = await loadTasks();
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+        
+        // Tasks for today
+        const todayTasks = tasks.filter(t => t.status === 'today');
+        
+        // Tasks due today
+        const dueToday = tasks.filter(t => {
+            if (!t.dueDate || t.status === 'done') return false;
+            const dueDate = new Date(t.dueDate);
+            return dueDate >= todayStart && dueDate < tomorrowStart;
+        });
+        
+        // Overdue tasks
+        const overdue = tasks.filter(t => {
+            if (t.status === 'done' || !t.dueDate) return false;
+            return new Date(t.dueDate) < todayStart;
+        });
+        
+        // High priority tasks
+        const highPriority = tasks.filter(t => 
+            t.status !== 'done' && 
+            (t.priority === 'urgent' || t.priority === 'high')
+        );
+        
+        // Inbox items that need attention
+        const inboxTasks = tasks.filter(t => t.status === 'inbox');
+        
+        const update = {
+            date: now.toISOString().split('T')[0],
+            todayTasks: todayTasks.length,
+            dueToday: dueToday.length,
+            overdue: overdue.length,
+            highPriority: highPriority.length,
+            inboxItems: inboxTasks.length,
+            tasks: {
+                today: todayTasks.map(t => ({
+                    id: t.id,
+                    title: t.title,
+                    priority: t.priority
+                })),
+                dueToday: dueToday.map(t => ({
+                    id: t.id,
+                    title: t.title,
+                    dueDate: t.dueDate,
+                    priority: t.priority
+                })),
+                overdue: overdue.map(t => ({
+                    id: t.id,
+                    title: t.title,
+                    dueDate: t.dueDate,
+                    priority: t.priority
+                })),
+                highPriority: highPriority.map(t => ({
+                    id: t.id,
+                    title: t.title,
+                    status: t.status,
+                    priority: t.priority
+                })),
+                inbox: inboxTasks.slice(0, 5).map(t => ({
+                    id: t.id,
+                    title: t.title,
+                    priority: t.priority
+                }))
+            }
+        };
+        
+        res.json(update);
+    } catch (error) {
+        console.error('Error generating morning update:', error);
+        res.status(500).json({ error: 'Failed to generate morning update' });
     }
 });
 

@@ -1,0 +1,107 @@
+{
+  "jobs": [
+    {
+      "name": "Morning Update - Executive Assistant",
+      "description": "AI Employee morning check-in and daily priority review",
+      "schedule": "0 8 * * *",
+      "timezone": "UTC", 
+      "enabled": true,
+      "payload": {
+        "channel": "telegram",
+        "target": "telegram_channel_or_user_id",
+        "message": {
+          "type": "ai_task",
+          "instructions": "You are the AI Employee Executive Assistant. Perform your morning routine:\n\n1. Get morning update data: `curl http://localhost:3000/api/morning-update`\n2. Review tasks for today, overdue items, and inbox\n3. Post morning check-in activity with summary of today's priorities\n4. Triage inbox items - move urgent/due items to appropriate columns\n5. Escalate any overdue tasks\n6. Post a concise morning briefing message to this channel\n\nKeep the channel message brief and actionable. Focus on key priorities and any items needing human attention.",
+          "context": "Daily morning routine for Executive Assistant Mission Control dashboard",
+          "data_sources": [
+            "http://localhost:3000/api/morning-update",
+            "http://localhost:3000/api/tasks",
+            "http://localhost:3000/api/stats"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Evening Summary - Executive Assistant", 
+      "description": "AI Employee daily wrap-up and next-day preparation",
+      "schedule": "0 18 * * *",
+      "timezone": "UTC",
+      "enabled": true, 
+      "payload": {
+        "channel": "telegram",
+        "target": "telegram_channel_or_user_id",
+        "message": {
+          "type": "ai_task",
+          "instructions": "You are the AI Employee Executive Assistant. Perform your evening routine:\n\n1. Get daily summary data: `curl http://localhost:3000/api/daily-summary`\n2. Review completed tasks, progress made, and current status\n3. Move any completed tasks from today/this-week to done status\n4. Post daily wrap-up activity with accomplishments and tomorrow's focus\n5. Archive tasks completed more than 7 days ago\n6. Prepare tomorrow's priority list\n7. Post a concise evening summary to this channel\n\nHighlight key accomplishments and preview tomorrow's priorities. Flag any blockers or items needing human attention.",
+          "context": "Daily evening summary for Executive Assistant Mission Control dashboard",
+          "data_sources": [
+            "http://localhost:3000/api/daily-summary", 
+            "http://localhost:3000/api/tasks",
+            "http://localhost:3000/api/activities"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Weekly Review - Executive Assistant",
+      "description": "AI Employee weekly planning and review session", 
+      "schedule": "0 17 * * 5",
+      "timezone": "UTC",
+      "enabled": true,
+      "payload": {
+        "channel": "telegram",
+        "target": "telegram_channel_or_user_id", 
+        "message": {
+          "type": "ai_task",
+          "instructions": "You are the AI Employee Executive Assistant. Perform your weekly review:\n\n1. Analyze this week's task completion data and patterns\n2. Generate weekly statistics (completed tasks, productivity trends, etc.)\n3. Review and clean up the Later column - archive old items\n4. Plan next week's priorities based on current backlog\n5. Create next week's planning task in this-week column\n6. Post weekly review activity and summary to dashboard\n7. Send weekly summary to this channel\n\nProvide insights on productivity trends and recommend focus areas for next week.",
+          "context": "Weekly review and planning for Executive Assistant Mission Control",
+          "data_sources": [
+            "http://localhost:3000/api/tasks",
+            "http://localhost:3000/api/activities",
+            "http://localhost:3000/api/stats"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Hourly Progress Check - Executive Assistant",
+      "description": "Periodic progress updates during work hours",
+      "schedule": "0 9-17 * * 1-5",
+      "timezone": "UTC", 
+      "enabled": true,
+      "payload": {
+        "channel": "internal",
+        "target": "system",
+        "message": {
+          "type": "ai_task",
+          "instructions": "You are the AI Employee Executive Assistant. Perform hourly maintenance:\n\n1. Check for completed tasks that should be moved to done status\n2. Update any task statuses based on progress\n3. Post progress update if significant activity occurred\n4. Monitor for new high-priority items in inbox\n5. NO external messages - this is internal maintenance only\n\nOnly post activities to the dashboard, not to external channels.",
+          "context": "Hourly maintenance for Executive Assistant Mission Control",
+          "data_sources": [
+            "http://localhost:3000/api/tasks"
+          ]
+        }
+      }
+    }
+  ],
+  "configuration": {
+    "description": "Executive Assistant Mission Control automated schedules",
+    "version": "1.0",
+    "dashboard_url": "http://localhost:3000",
+    "api_base": "http://localhost:3000/api",
+    "required_endpoints": [
+      "/api/morning-update",
+      "/api/daily-summary", 
+      "/api/tasks",
+      "/api/activities",
+      "/api/stats"
+    ],
+    "notes": [
+      "Update telegram_channel_or_user_id with actual Telegram destination",
+      "Morning update runs at 8 AM UTC daily",
+      "Evening summary runs at 6 PM UTC daily", 
+      "Weekly review runs at 5 PM UTC on Fridays",
+      "Hourly checks run 9 AM - 5 PM UTC weekdays",
+      "All times in UTC - adjust schedule if different timezone needed"
+    ]
+  }
+}
