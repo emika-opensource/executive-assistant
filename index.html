@@ -11,6 +11,16 @@
 </head>
 <body>
     <div class="app">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <h1 class="header-title">🚀 Mission Control</h1>
+            </div>
+            <div class="header-right">
+                <div class="header-stats" id="header-stats"></div>
+            </div>
+        </header>
+
         <main class="main">
             <!-- Inbox Panel (left) -->
             <aside class="inbox-panel" id="inbox-panel">
@@ -22,7 +32,10 @@
                 <div class="inbox-list" id="inbox-list"></div>
             </aside>
 
-            <!-- Board (main area) — columns rendered dynamically -->
+            <!-- Resize Handle -->
+            <div class="resize-handle" id="resize-handle"></div>
+
+            <!-- Board (main area) -->
             <section class="board-area" id="board-area">
                 <div class="board-top">
                     <button class="add-col-btn" id="add-col-btn" title="Add column">+ Column</button>
@@ -31,23 +44,23 @@
             </section>
         </main>
 
-        <!-- Bottom Tab Bar -->
-        <nav class="bottom-tabs">
-            <button class="tab-btn active" data-panel="inbox">
-                <span class="tab-icon">📥</span>
-                <span class="tab-label">Inbox</span>
-                <span class="tab-badge" id="inbox-badge" style="display:none">0</span>
+        <!-- Floating Toggle Buttons -->
+        <nav class="floating-toggles">
+            <button class="toggle-btn active" data-panel="inbox" title="Toggle Inbox">
+                <span class="toggle-icon">📥</span>
+                <span class="toggle-label">Inbox</span>
+                <span class="toggle-badge" id="inbox-badge" style="display:none">0</span>
             </button>
-            <button class="tab-btn active" data-panel="board">
-                <span class="tab-icon">📋</span>
-                <span class="tab-label">Board</span>
+            <button class="toggle-btn active" data-panel="board" title="Toggle Board">
+                <span class="toggle-icon">📋</span>
+                <span class="toggle-label">Board</span>
             </button>
         </nav>
     </div>
 
     <!-- Task Modal -->
     <div class="modal" id="task-modal">
-        <div class="modal-content">
+        <div class="modal-content modal-lg">
             <div class="modal-header">
                 <h3 id="modal-title">New Task</h3>
                 <button class="modal-close" id="modal-close">&times;</button>
@@ -55,30 +68,68 @@
             <div class="modal-body">
                 <form id="task-form">
                     <input type="hidden" id="task-id">
+
                     <div class="form-group">
-                        <input type="text" id="task-title" required placeholder="Task title">
+                        <input type="text" id="task-title" required placeholder="Task title" class="task-title-input">
                     </div>
+
                     <div class="form-group">
                         <textarea id="task-description" rows="2" placeholder="Description (optional)"></textarea>
                     </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <select id="task-priority">
-                                <option value="low">Low</option>
-                                <option value="medium" selected>Medium</option>
-                                <option value="high">High</option>
-                                <option value="urgent">Urgent</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <select id="task-status"></select>
+
+                    <!-- Priority Picker -->
+                    <div class="form-group">
+                        <label class="form-label">Priority</label>
+                        <input type="hidden" id="task-priority" value="medium">
+                        <div class="priority-picker" id="priority-picker">
+                            <button type="button" class="priority-option" data-value="low">
+                                <span class="priority-indicator low"></span>
+                                <span>Low</span>
+                            </button>
+                            <button type="button" class="priority-option selected" data-value="medium">
+                                <span class="priority-indicator medium"></span>
+                                <span>Medium</span>
+                            </button>
+                            <button type="button" class="priority-option" data-value="high">
+                                <span class="priority-indicator high"></span>
+                                <span>High</span>
+                            </button>
+                            <button type="button" class="priority-option" data-value="urgent">
+                                <span class="priority-indicator urgent"></span>
+                                <span>Urgent</span>
+                            </button>
                         </div>
                     </div>
+
+                    <!-- Status -->
                     <div class="form-group">
-                        <input type="datetime-local" id="task-due-date">
+                        <label class="form-label">Column</label>
+                        <select id="task-status"></select>
+                    </div>
+
+                    <!-- Deadline with suggestions -->
+                    <div class="form-group">
+                        <label class="form-label">Deadline</label>
+                        <div class="date-suggestions" id="date-suggestions">
+                            <button type="button" class="date-chip" data-date="today">Today</button>
+                            <button type="button" class="date-chip" data-date="tomorrow">Tomorrow</button>
+                            <button type="button" class="date-chip" data-date="this-week">This Friday</button>
+                            <button type="button" class="date-chip" data-date="next-week">Next Monday</button>
+                            <button type="button" class="date-chip" data-date="none">No deadline</button>
+                        </div>
+                        <input type="datetime-local" id="task-due-date" class="date-input">
                     </div>
                 </form>
+
+                <!-- Task Activity Feed (visible when editing) -->
+                <div class="task-activity" id="task-activity" style="display:none">
+                    <div class="activity-header">
+                        <span class="form-label">Activity</span>
+                    </div>
+                    <div class="activity-feed" id="activity-feed"></div>
+                </div>
             </div>
+
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" id="cancel-task">Cancel</button>
                 <button type="button" class="btn btn-danger" id="delete-task" style="display:none">Delete</button>
@@ -87,7 +138,7 @@
         </div>
     </div>
 
-    <!-- Column Modal (rename/delete) -->
+    <!-- Column Modal -->
     <div class="modal" id="col-modal">
         <div class="modal-content modal-sm">
             <div class="modal-header">

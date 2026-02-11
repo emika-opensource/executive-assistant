@@ -21,7 +21,6 @@ const DEFAULT_COLUMNS = [
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static('.'));
 
 // ── Helpers ──
 
@@ -51,7 +50,7 @@ async function logActivity(type, content, author = 'System') {
     try {
         const activities = await load(ACTIVITIES_FILE);
         activities.unshift({
-            id: `act_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+            id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
             type, content, author,
             createdAt: new Date().toISOString()
         });
@@ -139,7 +138,7 @@ app.get('/api/tasks/:id', async (req, res) => {
 app.post('/api/tasks', async (req, res) => {
     const tasks = await load(TASKS_FILE);
     const t = {
-        id: req.body.id || `task_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`,
+        id: req.body.id || `task_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`,
         title: req.body.title,
         description: req.body.description || '',
         priority: req.body.priority || 'medium',
@@ -170,6 +169,26 @@ app.put('/api/tasks', async (req, res) => {
     res.json(tasks[idx]);
 });
 
+// Add comment/activity to a specific task
+app.post('/api/tasks/:id/comments', async (req, res) => {
+    const tasks = await load(TASKS_FILE);
+    const task = tasks.find(t => t.id === req.params.id);
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+    if (!req.body.content) return res.status(400).json({ error: 'Content required' });
+    if (!task.comments) task.comments = [];
+    const comment = {
+        id: `cmt_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+        content: req.body.content,
+        author: req.body.author || 'AI Employee',
+        type: req.body.type || 'comment',
+        createdAt: new Date().toISOString()
+    };
+    task.comments.push(comment);
+    task.updatedAt = new Date().toISOString();
+    await save(TASKS_FILE, tasks);
+    res.status(201).json(comment);
+});
+
 app.delete('/api/tasks/:id', async (req, res) => {
     let tasks = await load(TASKS_FILE);
     const task = tasks.find(t => t.id === req.params.id);
@@ -190,7 +209,7 @@ app.post('/api/activities', async (req, res) => {
     if (!req.body.content) return res.status(400).json({ error: 'Content required' });
     const activities = await load(ACTIVITIES_FILE);
     const a = {
-        id: `act_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
         type: req.body.type || 'update',
         content: req.body.content,
         author: req.body.author || 'AI Employee',
@@ -218,7 +237,8 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// SPA fallback
+// Static files + SPA fallback (AFTER API routes)
+app.use(express.static(path.join(__dirname)));
 app.use((req, res) => {
     if (req.path.startsWith('/api/')) return res.status(404).json({ error: 'Not found' });
     res.sendFile(path.join(__dirname, 'index.html'));

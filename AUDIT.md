@@ -244,3 +244,53 @@ The SKILL.md describes an elaborate onboarding conversation ("explain what you a
 **Target time-to-first-value:** Under 60 seconds. User opens dashboard → sees welcome state with clear CTA → creates or tells AI their first task → sees it on the board. Done.
 
 The biggest wins are items #1 (welcome state), #3 (fix skill.js statuses), and #2 (fix BOOTSTRAP.md). These three changes alone would cut time-to-first-value by 80%.
+
+---
+
+## Fixes Applied
+
+**Date:** 2026-02-11
+
+### Critical
+
+1. **✅ Welcome/onboarding screen** — Added full first-run welcome card when task list is empty. Shows welcome message, CTA to create first task, and keyboard shortcut hint. Hides inbox/board panels and shows centered onboarding UI. Automatically disappears once the first task is created.
+
+2. **✅ Fixed BOOTSTRAP.md phantom endpoints** — Completely rewrote BOOTSTRAP.md. Removed references to non-existent `/api/morning-update` and `/api/daily-summary`. Reduced from 10 steps to 3 (health check → post welcome activity → delete file). Removed hardcoded dates and meta-tasks.
+
+3. **✅ Fixed skill.js status name mismatch** — Replaced all `backlog`, `in-progress`, `review` references with correct `inbox`, `today`, `this-week`, `later`, `done` throughout skill.js. Fixed `createTask` default status, `getStatistics` fallback, `generateDailySummary`, and `morningCheckIn`.
+
+### High Impact
+
+4. **✅ Toast/snackbar notifications** — Added toast notification system. All actions now show feedback: "Task created!", "Task updated", "Task deleted", "Moved to [column]", "Column added/renamed/deleted", and error messages for failed operations. CSS animations included.
+
+5. **✅ Keyboard shortcut `N`** — Implemented `N` key to open new task modal. Properly ignores keypresses when user is typing in inputs/textareas.
+
+6. **✅ Replaced `prompt()` for column creation** — Column creation now uses the same modal as column editing. "Add Column" button opens the column modal in create mode with delete button hidden.
+
+7. **✅ Loading state on initial load** — Added spinner with "Loading Mission Control…" text that displays while tasks and columns are being fetched. Uses CSS animation.
+
+8. **✅ Empty states with CTAs** — Inbox empty state now shows "Press N or click + to add one" hint. Board column empty states show "No tasks — drag here or click +". Done column shows "No completed tasks".
+
+9. **✅ Done column visual treatment** — The `.column-done` CSS class is now applied in the render function when `col.id === 'done'` (was never applied before).
+
+### Medium Impact
+
+10. **✅ Client-side error handling** — All `fetch` calls now check response status, show toast errors on failure, and handle network errors gracefully. `moveTask` uses optimistic update with rollback on failure. `saveCurrent` shows specific API error messages.
+
+11. **✅ Fixed cron-jobs.json** — Removed phantom `/api/morning-update` and `/api/daily-summary` from required_endpoints and job instructions. All jobs now reference only existing endpoints (`/api/tasks`, `/api/activities`, `/api/stats`).
+
+12. **✅ Deduplicated API docs in SKILL.md** — Removed duplicated API reference from SKILL.md, now points to TOOLS.md for the complete reference.
+
+13. **✅ Removed aspirational feature claims from SKILL.md** — Removed Calendar Integration and External Tool Import sections that referenced unimplemented features. Replaced "offer integrations" onboarding step with practical "ask what they need" step.
+
+### Low Impact
+
+14. **✅ Fixed README.md** — Removed claims for non-existent features (dark/light theme toggle, `/` search, `Ctrl+Enter` comment submit, activity feed sidebar). Updated column names from "Backlog, In Progress, Review, Done" to "Today, This Week, Later, Done". Added toast notifications and welcome onboarding to feature list. Fixed example code status values.
+
+15. **✅ Fixed deprecated `substr`** — Replaced all `.substr()` calls with `.substring()` in server.js and skill/skill.js.
+
+16. **✅ Fixed update-ai-image.py** — Replaced all `backlog`, `in-progress`, `review` status references with correct `inbox`, `today`, `this-week`, `later`, `done`.
+
+17. **✅ Created start.sh** — Added missing `start.sh` script that installs dependencies and starts the server.
+
+18. **✅ Fixed mission-control/SKILL.md** — The nested skill SKILL.md already used correct statuses; no changes needed.

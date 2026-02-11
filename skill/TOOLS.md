@@ -76,6 +76,27 @@ curl -X DELETE http://localhost:3000/api/tasks/task_123
 
 ---
 
+## Task Comments API
+
+Add activity/comments to specific tasks. These show up in the task detail modal.
+
+### Add a comment to a task
+```bash
+curl -X POST http://localhost:3000/api/tasks/task_123/comments \
+  -H "Content-Type: application/json" \
+  -d '{"content":"Started working on this. ETA 2 hours.","author":"AI Employee","type":"progress"}'
+```
+
+Comment types: `comment` (default), `progress`, `status`, `note`
+
+Use this to:
+- Log progress updates on tasks ("50% complete, waiting on API response")
+- Add context ("User mentioned this is related to the Q2 launch")
+- Record status changes ("Moved to Today — deadline approaching")
+- Leave notes ("Blocked by missing credentials, asked user")
+
+---
+
 ## Activities API
 
 ### Post an update

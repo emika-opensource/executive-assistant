@@ -36,13 +36,13 @@ await missionControl.createTask({
     title: "Weekly team sync",
     description: "Organize and facilitate weekly team meeting",
     priority: "high", // low, medium, high, urgent
-    status: "backlog", // backlog, in-progress, review, done
+    status: "inbox", // inbox, today, this-week, later, done
     assignee: "AI Employee",
     dueDate: "2026-02-15T10:00:00Z"
 });
 
 // Update task status
-await missionControl.moveTask(taskId, "in-progress");
+await missionControl.moveTask(taskId, "today");
 
 // Add comments and notes
 await missionControl.addTaskComment(taskId, "Started research, estimated 2 hours to complete");
@@ -57,11 +57,11 @@ Keep the team informed with regular updates:
 ```javascript
 // Daily check-ins
 await missionControl.logActivity("checkin", 
-    "Good morning! Ready to tackle today's priorities. I see 3 urgent items in the backlog.");
+    "Good morning! Ready to tackle today's priorities. I see 3 urgent items in the inbox.");
 
 // Progress updates
 await missionControl.logActivity("progress", 
-    "Completed email campaign task, moving presentation prep to review stage.");
+    "Completed email campaign task, moving presentation prep to this-week.");
 
 // Issue notifications
 await missionControl.logActivity("alert", 

@@ -5,7 +5,7 @@ A full-featured Mission Control dashboard for Emika's AI Employee Executive Assi
 ## Features
 
 ### 🎯 Kanban Board
-- **Four Columns**: Backlog, In Progress, Review, Done
+- **Dynamic Columns**: Today, This Week, Later, Done (customizable)
 - **Drag & Drop**: Move tasks between columns with visual feedback
 - **Rich Task Cards**: Priority badges, due dates, assignee, comment count
 - **Task Details**: Full description, comments thread, metadata
@@ -16,14 +16,15 @@ A full-featured Mission Control dashboard for Emika's AI Employee Executive Assi
 - Automatic updates as tasks change status
 
 ### 🤖 AI Activity Feed
-- Live feed of AI Employee actions and updates
+- Activity logging via API for AI Employee actions
 - Timestamps and categorized activity types
-- Sidebar layout with notification badges
+- Per-task activity visible in task detail modal
 
 ### ✨ Advanced Features
-- **Dark/Light Theme**: Toggle with system preference detection
-- **Keyboard Shortcuts**: `N` for new task, `/` for search, `ESC` to close modal
-- **Smart Filtering**: Filter by priority, search by title/description
+- **Keyboard Shortcuts**: `N` for new task, `ESC` to close modal
+- **Toast Notifications**: Feedback on every action (create, move, delete)
+- **Welcome Onboarding**: First-run experience guides new users
+- **Loading States**: Spinner on initial load
 - **Comments System**: Threaded discussions on tasks
 - **Responsive Design**: Works on desktop and mobile
 
@@ -108,7 +109,7 @@ Tasks and activities are stored in JSON files:
   "title": "Implement user authentication",
   "description": "Add login/logout functionality with session management",
   "priority": "high",
-  "status": "in-progress",
+  "status": "today",
   "assignee": "AI Employee",
   "dueDate": "2026-02-15T10:00:00Z",
   "createdAt": "2026-02-08T17:48:46Z",
@@ -146,7 +147,7 @@ await fetch('http://localhost:3000/api/tasks', {
     title: 'Daily status report',
     description: 'Generate and send weekly progress summary',
     priority: 'medium',
-    status: 'backlog',
+    status: 'inbox',
     assignee: 'AI Employee'
   })
 });
@@ -180,9 +181,7 @@ await fetch('http://localhost:3000/api/activities', {
 ## Keyboard Shortcuts
 
 - `N`: Create new task
-- `/`: Focus search input
 - `ESC`: Close modal/dialog
-- `Ctrl+Enter`: Submit comment (when in comment textarea)
 
 ## Browser Support
 

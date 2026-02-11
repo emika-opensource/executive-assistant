@@ -141,7 +141,7 @@ class MissionControlSkill {
       title: taskData.title,
       description: taskData.description || '',
       priority: taskData.priority || 'medium',
-      status: taskData.status || 'backlog',
+      status: taskData.status || 'inbox',
       assignee: taskData.assignee || 'AI Employee',
       dueDate: taskData.dueDate || null,
       createdAt: new Date().toISOString(),
@@ -356,9 +356,9 @@ class MissionControlSkill {
       return {
         total: tasks.length,
         byStatus: {
-          backlog: tasks.filter(t => t.status === 'backlog').length,
-          'in-progress': tasks.filter(t => t.status === 'in-progress').length,
-          review: tasks.filter(t => t.status === 'review').length,
+          inbox: tasks.filter(t => t.status === 'inbox').length,
+          'today': tasks.filter(t => t.status === 'today').length,
+          'this-week': tasks.filter(t => t.status === 'this-week').length,
           done: tasks.filter(t => t.status === 'done').length
         },
         byPriority: {
@@ -383,13 +383,13 @@ class MissionControlSkill {
     const stats = await this.getStatistics();
     const overdue = await this.getOverdueTasks();
     const urgent = await this.getUrgentTasks();
-    const inProgress = await this.getTasksByStatus('in-progress');
+    const todayTasks = await this.getTasksByStatus('today');
     
     let summary = `📊 Daily Summary:\n`;
     summary += `• Total Tasks: ${stats.total}\n`;
     summary += `• Completed Today: ${stats.completedToday}\n`;
-    summary += `• In Progress: ${stats.byStatus['in-progress']}\n`;
-    summary += `• Pending Review: ${stats.byStatus.review}\n`;
+    summary += `• Today: ${stats.byStatus['today']}\n`;
+    summary += `• This Week: ${stats.byStatus['this-week']}\n`;
     
     if (overdue.length > 0) {
       summary += `• ⚠️ Overdue: ${overdue.length}\n`;
@@ -399,9 +399,9 @@ class MissionControlSkill {
       summary += `• 🔥 Urgent: ${urgent.length}\n`;
     }
     
-    if (inProgress.length > 0) {
-      summary += `\n🔄 Currently working on:\n`;
-      inProgress.slice(0, 3).forEach(task => {
+    if (todayTasks.length > 0) {
+      summary += `\n📋 Today's focus:\n`;
+      todayTasks.slice(0, 3).forEach(task => {
         summary += `• ${task.title}\n`;
       });
     }
@@ -440,7 +440,7 @@ class MissionControlSkill {
   async morningCheckIn() {
     const overdue = await this.getOverdueTasks();
     const urgent = await this.getUrgentTasks();
-    const inProgress = await this.getTasksByStatus('in-progress');
+    const todayTasks = await this.getTasksByStatus('today');
     
     let message = "🌅 Good morning! Here's your mission status:\n\n";
     
@@ -460,9 +460,9 @@ class MissionControlSkill {
       message += '\n';
     }
     
-    if (inProgress.length > 0) {
-      message += `🔄 ${inProgress.length} tasks in progress:\n`;
-      inProgress.forEach(task => {
+    if (todayTasks.length > 0) {
+      message += `📋 ${todayTasks.length} tasks for today:\n`;
+      todayTasks.forEach(task => {
         message += `• ${task.title}\n`;
       });
     } else {
@@ -499,7 +499,7 @@ class MissionControlSkill {
   // ====================
 
   generateId() {
-    return `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `task_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
   }
 
   getWeekStart() {
