@@ -78,7 +78,11 @@ public
 .tern-port
 
 # Local data files
-data/
+# Runtime data (user-generated)
+data/*.db
+data/*.log
+data/projects/
+data/kb/
 *.json.bak
 logs/
 
