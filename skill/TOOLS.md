@@ -130,3 +130,23 @@ curl http://localhost:3000/api/activities
 2. `PUT /api/columns/:id` — rename existing
 3. `PUT /api/columns` — reorder all at once
 4. `DELETE /api/columns/:id` — remove unused
+
+
+## Browser & Screenshots (Playwright)
+
+Playwright and Chromium are pre-installed. Use them for browsing websites, taking screenshots, scraping content, and testing.
+
+```bash
+# Quick screenshot
+npx playwright screenshot --full-page https://example.com screenshot.png
+
+# In Node.js
+const { chromium } = require("playwright");
+const browser = await chromium.launch();
+const page = await browser.newPage();
+await page.goto("https://example.com");
+await page.screenshot({ path: "screenshot.png", fullPage: true });
+await browser.close();
+```
+
+Do NOT install Puppeteer or download Chromium — Playwright is already here and ready to use.
